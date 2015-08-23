@@ -42,14 +42,7 @@ Serial bb(PA_11, PA_12); // tx, rx jvm added 8/15/15
 //?? 8/16/15 DigitalOut myled(LED1);
 
 Timer t; //imu 8/16/15
-/* Code to add to read mpu9250
 
-
-char buffer[14];
-//jvm 8/2/15
-float az_max=0, az_min=10000;
-
-*/
 
 /* Functions----------------------------------------------------------------------*/
 
@@ -144,6 +137,107 @@ bb.baud(9600);
     magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
     magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
     imu_isr_ticker.attach(&imu_isr, .1); //for now only call 10hz.005);   
+
+    pc.attach(&serialRx,Serial::RxIrq);                                                 // Attach a function serialRx to be called whenever a serial interrupt is generated
+    while(1) {
+        if(received >0) {
+            switch (buffer[0]) {
+                case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
+                    for( int k=0; k<39; k++)
+                        pc.putc(*(ptr+k));
+                        //bb.putc(*(ptr+k));
+                    
+                    pc.putc('\n');    
+                    //bb.putc('\n');    
+                    //bb.printf("Success!\r\n");
+                    received=0;
+                    break;
+                default :
+			//pc.printf("%c,\r\n", buffer[received-1]);
+                    break;
+            }
+//**8/23 beg
+if (buffer[received -1]==':')
+{	pc.printf("Got it!\r\n", i++);	
+	received=0;
+}
+//**8/23 end
+        }
+//8/23        received=0;                                                             // number of received charracters is 0
+        wait(1);
+        i++;                                                                       // wait 1 second
+        //pc.printf("This program runs since %d seconds.\r\n", i++);                      // sends how long is the program running
+        myled = !myled;
+    }
+}
+
+/*******************************************************************************
+* Function Name  : imu_isr.
+* Description    : polls mpu9250 8/16/15.
+* Input          : None
+* Output         : None.
+* Return         : None
+*******************************************************************************/
+
+ void imu_isr()  {
+   
+  // If intPin goes high, all data registers have new data
+  if(mpu9250.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+
+    mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values   
+    // Now we'll calculate the accleration value into actual g's
+    data_from_imu.ax =ax = (float)(accelCount[0]*aRes - accelBias[0]);  // get actual g value, this depends on scale being set
+    data_from_imu.ay =ay = (float)(accelCount[1]*aRes - accelBias[1]);   //jvm 8/16/15 added () to entire eq
+    data_from_imu.az =az = (float)(accelCount[2]*aRes - accelBias[2]);  
+   
+    mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
+    // Calculate the gyro value into actual degrees per second
+    data_from_imu.gx =gx = (float)(gyroCount[0]*gRes - gyroBias[0]);  // get actual gyro value, this depends on scale being set
+    data_from_imu.gy =gy = (float)(gyroCount[1]*gRes - gyroBias[1]);  
+    data_from_imu.gz =gz = (float)(gyroCount[2]*gRes - gyroBias[2]);   
+  
+    mpu9250.readMagData(magCount);  // Read the x/y/z adc values   
+    // Calculate the magnetometer values in milliGauss
+    // Include factory calibration per data sheet and user environmental corrections
+    data_from_imu.mx =mx = (float)(magCount[0]*mRes*magCalibration[0] - magbias[0]);  // get actual magnetometer value, this depends on scale being set
+    data_from_imu.my =my = (float)(magCount[1]*mRes*magCalibration[1] - magbias[1]);  
+    data_from_imu.mz =mz = (float)(magCount[2]*mRes*magCalibration[2] - magbias[2]);   
+
+#if 0
+    //remove for debug**
+    mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values    
+    data_from_imu.ax =(float)accelCount[0];//*aRes;// - accelBias[0]);  // get actual g value, this depends on scale being set
+    data_from_imu.ay =(float)accelCount[1];//*aRes;// - accelBias[1]);   //jvm 8/16/15 added () to entire eq
+    data_from_imu.az =(float)accelCount[2];//*aRes;// - accelBias[2]);  
+mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
+    // Calculate the gyro value into actual degrees per second
+    data_from_imu.gx =(float)gyroCount[0];  // get actual gyro value, this depends on scale being set
+    data_from_imu.gy =(float)gyroCount[1];  
+    data_from_imu.gz =(float)gyroCount[2];   
+ mpu9250.readMagData(magCount);  // Read the x/y/z adc values  
+    // Calculate the magnetometer values in milliGauss
+    // Include factory calibration per data sheet and user environmental corrections
+    data_from_imu.mx =(float)magCount[0];  // get actual magnetometer value, this depends on scale being set
+    data_from_imu.my =(float)magCount[1];  
+    data_from_imu.mz =(float)magCount[2];  
+  //*****end remove
+
+#endif 
+  }
+    
+   // Pass gyro rate as rad/s
+if (az > az_max)
+    az_max=az;
+if (az < az_min)
+    az_min=az;
+    
+  //mpu9250.MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
+    
+    Now = t.read_us();
+    deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
+    lastUpdate = Now;
+
+}
 /*        pc.printf("mpu9250 address 0x%x\n\r", MPU9250_ADDRESS); 
         pc.printf("I AM 0x%x\n\r", whoami); pc.printf("I SHOULD BE 0x71\n\r");
     
@@ -227,12 +321,14 @@ bb.baud(9600);
                 pc.printf(" temperature = %f  C\n\r", temperature); 
                 
                 pc.printf("q0 = %f\n\r", q[0]);
+
                 pc.printf("q1 = %f\n\r", q[1]);
                 pc.printf("q2 = %f\n\r", q[2]);
                 pc.printf("q3 = %f  this took %f usec TO READ\n\r", q[3], deltat);      
                 //bb.printf("hellow world\n\r"); //jvm 8/4/15
          
           // Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
+
           // In this coordinate system, the positive z-axis is down toward Earth. 
           // Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
           // Pitch is angle between sensor x-axis and Earth ground plane, toward the Earth is positive, up toward the sky is negative.
@@ -254,6 +350,7 @@ bb.baud(9600);
               
                 myled= !myled;
 
+
                 count = t.read_ms(); 
             
                 if(count > 1<<21) {
@@ -267,98 +364,3 @@ bb.baud(9600);
             } //// if > .5s
 */ 
 //    }//while loop
-    //pc.attach(&serialRx,Serial::RxIrq);                                                 // Attach a function serialRx to be called whenever a serial interrupt is generated
-    pc.attach(&serialRx,Serial::RxIrq);                                                 // Attach a function serialRx to be called whenever a serial interrupt is generated
-    while(1) {
-        if(received >0) {
-            switch (buffer[0]) {
-                case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
-                    for( int k=0; k<39; k++)
-                        pc.putc(*(ptr+k));
-                        //bb.putc(*(ptr+k));
-                    
-                    pc.putc('\n');    
-                    //bb.putc('\n');    
-                    //bb.printf("Success!\r\n");
-                    
-                    break;
-                default :
-                    break;
-            }
-
-        }
-        received=0;                                                             // number of received charracters is 0
-        wait(1);
-        i++;                                                                       // wait 1 second
-        //pc.printf("This program runs since %d seconds.\r\n", i++);                      // sends how long is the program running
-        myled = !myled;
-    }
-}
-
-/*******************************************************************************
-* Function Name  : imu_isr.
-* Description    : polls mpu9250 8/16/15.
-* Input          : None
-* Output         : None.
-* Return         : None
-*******************************************************************************/
-
- void imu_isr()  {
-   
-  // If intPin goes high, all data registers have new data
-  if(mpu9250.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
-
-    mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values   
-    // Now we'll calculate the accleration value into actual g's
-    data_from_imu.ax =ax = (float)(accelCount[0]*aRes - accelBias[0]);  // get actual g value, this depends on scale being set
-    data_from_imu.ay =ay = (float)(accelCount[1]*aRes - accelBias[1]);   //jvm 8/16/15 added () to entire eq
-    data_from_imu.az =az = (float)(accelCount[2]*aRes - accelBias[2]);  
-   
-    mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
-    // Calculate the gyro value into actual degrees per second
-    data_from_imu.gx =gx = (float)(gyroCount[0]*gRes - gyroBias[0]);  // get actual gyro value, this depends on scale being set
-    data_from_imu.gy =gy = (float)(gyroCount[1]*gRes - gyroBias[1]);  
-    data_from_imu.gz =gz = (float)(gyroCount[2]*gRes - gyroBias[2]);   
-  
-    mpu9250.readMagData(magCount);  // Read the x/y/z adc values   
-    // Calculate the magnetometer values in milliGauss
-    // Include factory calibration per data sheet and user environmental corrections
-    data_from_imu.mx =mx = (float)(magCount[0]*mRes*magCalibration[0] - magbias[0]);  // get actual magnetometer value, this depends on scale being set
-    data_from_imu.my =my = (float)(magCount[1]*mRes*magCalibration[1] - magbias[1]);  
-    data_from_imu.mz =mz = (float)(magCount[2]*mRes*magCalibration[2] - magbias[2]);   
-
-#if 0
-    //remove for debug**
-    mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values    
-    data_from_imu.ax =(float)accelCount[0];//*aRes;// - accelBias[0]);  // get actual g value, this depends on scale being set
-    data_from_imu.ay =(float)accelCount[1];//*aRes;// - accelBias[1]);   //jvm 8/16/15 added () to entire eq
-    data_from_imu.az =(float)accelCount[2];//*aRes;// - accelBias[2]);  
-mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
-    // Calculate the gyro value into actual degrees per second
-    data_from_imu.gx =(float)gyroCount[0];  // get actual gyro value, this depends on scale being set
-    data_from_imu.gy =(float)gyroCount[1];  
-    data_from_imu.gz =(float)gyroCount[2];   
- mpu9250.readMagData(magCount);  // Read the x/y/z adc values  
-    // Calculate the magnetometer values in milliGauss
-    // Include factory calibration per data sheet and user environmental corrections
-    data_from_imu.mx =(float)magCount[0];  // get actual magnetometer value, this depends on scale being set
-    data_from_imu.my =(float)magCount[1];  
-    data_from_imu.mz =(float)magCount[2];  
-  //*****end remove
-
-#endif 
-  }
-    
-   // Pass gyro rate as rad/s
-if (az > az_max)
-    az_max=az;
-if (az < az_min)
-    az_min=az;
-    
-  //mpu9250.MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
-    
-    Now = t.read_us();
-    deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
-    lastUpdate = Now;
-
-}
