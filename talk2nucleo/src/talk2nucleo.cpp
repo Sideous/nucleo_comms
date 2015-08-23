@@ -23,7 +23,7 @@ int main() {
 * directory for copyright and GNU GPLv3 license information.            */
 
 // Beginning
-//added by jvm 8/10/15
+//added by jvm 8/10/15 testing  git
 #include <iostream>
 #include <fstream>
 using namespace std;
