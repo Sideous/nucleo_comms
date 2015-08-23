@@ -96,7 +96,7 @@ int main()
 //--------------------------------------
 // Example for default settings:
 // pc.format(8,SerialBase::None,1);
-pc.baud(115200); //9600, 19200, 57600, 115200 testing git
+pc.baud(115200); //9600, 19200, 57600, 115200 testing git again
 //--------------------------------------
 bb.baud(9600); 
 // bb.baud(115200); 
