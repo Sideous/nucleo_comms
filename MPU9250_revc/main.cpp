@@ -89,7 +89,8 @@ int main()
 //--------------------------------------
 // Example for default settings:
 // pc.format(8,SerialBase::None,1);
-pc.baud(115200); //9600, 19200, 57600, 115200 testing git again
+//pc.baud(115200); //9600, 19200, 57600, 115200 testing git again
+pc.baud(9600); //9600, 19200, 57600, 115200 testing git again 8/23
 //--------------------------------------
 bb.baud(9600); 
 // bb.baud(115200); 
@@ -138,31 +139,54 @@ bb.baud(9600);
     magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
     imu_isr_ticker.attach(&imu_isr, .1); //for now only call 10hz.005);   
 
-    pc.attach(&serialRx,Serial::RxIrq);                                                 // Attach a function serialRx to be called whenever a serial interrupt is generated
+    pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt is generated
     while(1) {
         if(received >0) {
-            switch (buffer[0]) {
-                case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
-                    for( int k=0; k<39; k++)
-                        pc.putc(*(ptr+k));
-                        //bb.putc(*(ptr+k));
-                    
-                    pc.putc('\n');    
-                    //bb.putc('\n');    
-                    //bb.printf("Success!\r\n");
-                    received=0;
-                    break;
-                default :
+	    switch (buffer[0]) {
+	        case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
+	            for( int k=0; k<39; k++)
+	                pc.putc(*(ptr+k));
+	                //bb.putc(*(ptr+k));
+	            
+	            pc.putc('\n');    
+	            //bb.putc('\n');    
+	            //bb.printf("Success!\r\n");
+	            received=0;
+	            break;
+	        default :
 			//pc.printf("%c,\r\n", buffer[received-1]);
-                    break;
-            }
+	            break;
+	    } //for switch
 //**8/23 beg
-if (buffer[received -1]==':')
-{	pc.printf("Got it!\r\n", i++);	
-	received=0;
-}
-//**8/23 end
-        }
+
+	char * ptr;
+	//char num[6]={"      "}
+	int address, temp;
+	ptr=strchr(buffer,':');
+	if (*ptr) {
+		if(strstr(buffer,"read")) {
+			//read 0x##: reads register ##
+			pc.printf("read REG address is ");
+			//num[0]=*(ptr-2);//atoi needed a const char
+			//num[1]=*(ptr-1);
+			
+			if(*(ptr-3)=='x') {	//its in hex 
+				pc.printf("0x");
+				//add routine to convert hex value to dec
+			}
+			else	
+				address=atoi((ptr-2));
+			//pc.printf("%c%c \r\n", *(ptr-2),*(ptr-1));
+			pc.printf("%d \r\n", address);
+			for(received=254; received >-1 ;received--)
+				buffer[received]=0;
+			received=0;
+		}	
+
+
+	}
+
+     } //for while
 //8/23        received=0;                                                             // number of received charracters is 0
         wait(1);
         i++;                                                                       // wait 1 second
