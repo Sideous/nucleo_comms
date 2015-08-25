@@ -11,9 +11,14 @@
 #include "mbed.h"
 #include "MPU9250.h" //imu 8/16/15
 /* Defines -----------------------------------------------------------------------*/
+ 
+//#include<stdio.h>
+//#include<stdlib.h>
+//#include<math.h>
+ 
 
 /* Function prototypes -----------------------------------------------------------*/
-
+unsigned long convertToDecimal(char hex[]);
 /* Variables ---------------------------------------------------------------------*/
 char buffer[255];               // for receiving more characters from the computer
 int received=0;                 // how many characters were received from computer
@@ -140,6 +145,10 @@ bb.baud(9600);
     imu_isr_ticker.attach(&imu_isr, .1); //for now only call 10hz.005);   
 
     pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt is generated
+	
+	char * hptr; //ptr for terminal input
+	char hex[9]={"00000000"};
+	int address, temp;
     while(1) {
         if(received >0) {
 	    switch (buffer[0]) {
@@ -157,26 +166,23 @@ bb.baud(9600);
 			//pc.printf("%c,\r\n", buffer[received-1]);
 	            break;
 	    } //for switch
-//**8/23 beg
 
-	char * ptr;
-	//char num[6]={"      "}
-	int address, temp;
-	ptr=strchr(buffer,':');
-	if (*ptr) {
+
+	hptr=strchr(buffer,':');
+	if (*hptr) {
 		if(strstr(buffer,"read")) {
-			//read 0x##: reads register ##
+			//read $$ reads register dec$$, read 0x##: reads register hex##
 			pc.printf("read REG address is ");
-			//num[0]=*(ptr-2);//atoi needed a const char
-			//num[1]=*(ptr-1);
-			
-			if(*(ptr-3)=='x') {	//its in hex 
-				pc.printf("0x");
-				//add routine to convert hex value to dec
+
+			if(*(hptr-3)=='x') {	//its in hex 
+				hex[8]='\0';
+				hex[7]=*(hptr-1);
+				hex[6]=*(hptr-2);
+				address=(int) convertToDecimal(hex);
 			}
 			else	
-				address=atoi((ptr-2));
-			//pc.printf("%c%c \r\n", *(ptr-2),*(ptr-1));
+				address=atoi((hptr-2));
+			//pc.printf("%c%c \r\n", *(hptr-2),*(hptr-1));
 			pc.printf("%d \r\n", address);
 			for(received=254; received >-1 ;received--)
 				buffer[received]=0;
@@ -262,6 +268,63 @@ if (az < az_min)
     lastUpdate = Now;
 
 }
+
+/**
+* Title               : Convert Hexadecimal to Decimal(Hexadecimal to Decimal.c)
+* Program Description : Write a C Program to Convert
+* Hexadecimal Number to Decimal Number.
+* Author              : robustprogramming.com
+* Interface           : Console
+* IDE                 : Code::Blocks 13.12
+* Operating System    : Windows 8.1
+*/
+ 
+
+unsigned long convertToDecimal(char hex[])
+{
+    char *hexString;
+    int length = 0;
+    const int base = 16; // Base of Hexadecimal Number
+    unsigned long decimalNumber = 0;
+    int i;
+    // Find length of Hexadecimal Number
+    for (hexString = hex; *hexString != '\0'; hexString++)
+    {
+        length++;
+    }
+    // Find Hexadecimal Number
+    hexString = hex;
+    for (i = 0; *hexString != '\0' && i < length; i++, hexString++)
+    {
+        // Compare *hexString with ASCII values
+        if (*hexString >= 48 && *hexString <= 57)   // is *hexString Between 0-9
+        {
+            decimalNumber += (((int)(*hexString)) - 48) * pow(base, length - i - 1);
+        }
+        else if ((*hexString >= 65 && *hexString <= 70))   // is *hexString Between A-F
+        {
+            decimalNumber += (((int)(*hexString)) - 55) * pow(base, length - i - 1);
+        }
+        else if (*hexString >= 97 && *hexString <= 102)   // is *hexString Between a-f
+        {
+            decimalNumber += (((int)(*hexString)) - 87) * pow(base, length - i - 1);
+        }
+        else
+        {
+            printf(" Invalid Hexadecimal Number \n");
+ 
+            printf(" Press enter to continue... \n");
+            fflush(stdin);
+            getchar();
+            return 0;
+            exit(0);
+        }
+    }
+    return decimalNumber;
+}
+
+
+// leftovers
 /*        pc.printf("mpu9250 address 0x%x\n\r", MPU9250_ADDRESS); 
         pc.printf("I AM 0x%x\n\r", whoami); pc.printf("I SHOULD BE 0x71\n\r");
     
