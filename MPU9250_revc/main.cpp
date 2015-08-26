@@ -184,6 +184,9 @@ bb.baud(9600);
 				address=atoi((hptr-2));
 			//pc.printf("%c%c \r\n", *(hptr-2),*(hptr-1));
 			pc.printf("%d \r\n", address);
+
+			buffer[0]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
+			pc.printf("value read 0x%x\r\n", buffer[0]);
 			for(received=254; received >-1 ;received--)
 				buffer[received]=0;
 			received=0;
