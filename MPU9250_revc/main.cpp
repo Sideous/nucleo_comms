@@ -67,7 +67,8 @@ void serialRx()
 {
     while(pc.readable()) {              // while there is a character to read from the serial port.
         char c=pc.getc();               // receive the charracter
-        buffer[received++]=c;           // save the charracter to the next place in buffer, increments number of received charactbers
+        buffer[received++]=c;           // save the charracter to the next place in buffer, increments number of receive charactbers
+	pc.putc(c);			//echo
     }
 }
 
@@ -146,7 +147,7 @@ bb.baud(9600);
 
     pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt is generated
 	
-	char * hptr; //ptr for terminal input
+	char * hptr, * qptr; //ptr for terminal input
 	char hex[9]={"00000000"};
 	int address, temp;
     while(1) {
@@ -172,7 +173,7 @@ bb.baud(9600);
 	if (*hptr) {
 		if(strstr(buffer,"read")) {
 			//read $$ reads register dec$$, read 0x##: reads register hex##
-			pc.printf("read REG address is ");
+//			pc.printf("read REG address is ");
 
 			if(*(hptr-3)=='x') {	//its in hex 
 				hex[8]='\0';
@@ -181,15 +182,19 @@ bb.baud(9600);
 				address=(int) convertToDecimal(hex);
 			}
 			else	
-				address=atoi((hptr-2));
-			//pc.printf("%c%c \r\n", *(hptr-2),*(hptr-1));
-			pc.printf("%d \r\n", address);
+				address=atoi((hptr-3));
+			pc.printf("\r\n");
+//			pc.printf("%d \r\n", address);
 
-			buffer[0]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
-			pc.printf("value read 0x%x\r\n", buffer[0]);
-			for(received=254; received >-1 ;received--)
-				buffer[received]=0;
-			received=0;
+			buffer[254]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
+			pc.printf("value read 0x%x\r\n", buffer[254]);
+			qptr=strchr(buffer,'Q');
+			if(*qptr || (strstr(buffer,"loop") == NULL)) { //should enter only if loop is not input
+				for(received=254; received >-1 ;received--)
+					buffer[received]=0;
+				received=0;
+			} //end else if
+
 		}	
 
 
