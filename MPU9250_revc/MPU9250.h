@@ -421,7 +421,7 @@ void initMPU9250()
    
  // Set accelerometer configuration
   c =  readByte(MPU9250_ADDRESS, ACCEL_CONFIG);
-  // 8/19/15 jvm writeByte(MPU9250_ADDRESS, ACCEL_CONFIG, c & ~0xE0); // Clear self-test bits [7:5] 
+  writeByte(MPU9250_ADDRESS, ACCEL_CONFIG, c & ~0xE0); // Clear self-test bits [7:5] 
   writeByte(MPU9250_ADDRESS, ACCEL_CONFIG, c & ~0x18); // Clear AFS bits [4:3]
   writeByte(MPU9250_ADDRESS, ACCEL_CONFIG, c | Ascale << 3); // Set full scale range for the accelerometer 
 

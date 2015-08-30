@@ -19,6 +19,8 @@
 
 /* Function prototypes -----------------------------------------------------------*/
 unsigned long convertToDecimal(char hex[]);
+void enable_fifo(void);
+int  pull_data_from_fifo( void);
 /* Variables ---------------------------------------------------------------------*/
 char buffer[255];               // for receiving more characters from the computer
 int received=0;                 // how many characters were received from computer
@@ -143,10 +145,10 @@ bb.baud(9600);
     magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
     magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
     magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
-    imu_isr_ticker.attach(&imu_isr, .1); //for now only call 10hz.005);   
+    imu_isr_ticker.attach(&imu_isr, .025); // 8/29 changed from .1//for now only call 10hz.005);   
 
-    pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt is generated
-	
+    pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt generated
+enable_fifo();//jvm 8/29	
 	char * hptr, * qptr; //ptr for terminal input
 	char hex[9]={"00000000"};
 	int address, temp;
@@ -154,6 +156,10 @@ bb.baud(9600);
         if(received >0) {
 	    switch (buffer[0]) {
 	        case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
+//so I can get away with just terminal editor
+pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
+ 
+/*keep I want this later
 	            for( int k=0; k<39; k++)
 	                pc.putc(*(ptr+k));
 	                //bb.putc(*(ptr+k));
@@ -162,6 +168,7 @@ bb.baud(9600);
 	            //bb.putc('\n');    
 	            //bb.printf("Success!\r\n");
 	            received=0;
+end keep I want this later*/
 	            break;
 	        default :
 			//pc.printf("%c,\r\n", buffer[received-1]);
@@ -218,7 +225,8 @@ bb.baud(9600);
 *******************************************************************************/
 
  void imu_isr()  {
-   
+   pull_data_from_fifo();
+/* jvm 8/29
   // If intPin goes high, all data registers have new data
   if(mpu9250.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 
@@ -274,7 +282,7 @@ if (az < az_min)
     Now = t.read_us();
     deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
     lastUpdate = Now;
-
+*/
 }
 
 /**
@@ -331,6 +339,129 @@ unsigned long convertToDecimal(char hex[])
     return decimalNumber;
 }
 
+void enable_fifo(void)	{
+  
+
+  
+
+// Configure MPU9250 gyro and accelerometer for bias calculation
+  mpu9250.writeByte(MPU9250_ADDRESS, CONFIG, 0x01);      // Set low-pass filter to 188 Hz
+  mpu9250.writeByte(MPU9250_ADDRESS, SMPLRT_DIV, 0x00);  // Set sample rate to 1 kHz
+  mpu9250.writeByte(MPU9250_ADDRESS, GYRO_CONFIG, 0x00);  // Set gyro full-scale to 250 degrees per second, maximum sensitivity
+  mpu9250.writeByte(MPU9250_ADDRESS, ACCEL_CONFIG, 0x00); // Set accelerometer full-scale to 2 g, maximum sensitivity
+ 
+//  uint16_t  gyrosensitivity  = 131;   // = 131 LSB/degrees/sec
+//  uint16_t  accelsensitivity = 16384;  // = 16384 LSB/g
+
+// Configure FIFO to capture accelerometer and gyro data for bias calculation
+  mpu9250.writeByte(MPU9250_ADDRESS, USER_CTRL, 0x40);   // Enable FIFO  
+  mpu9250.writeByte(MPU9250_ADDRESS, FIFO_EN, 0x78);     // Enable gyro and accelerometer sensors for FIFO (max size 512 bytes in MPU-9250)
+}
+int  pull_data_from_fifo( void)	{
+
+  uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
+  uint16_t ii, packet_count, fifo_count;
+  int32_t gyro_avg[3] = {0, 0, 0}, accel_avg[3] = {0, 0, 0};
+int status;
+//jvm mod 8/29  wait(0.04); // accumulate 40 samples in 80 milliseconds = 480 bytes
+
+//jvm mod 8/29// At end of sample accumulation, turn off FIFO sensor read
+//jvm mod 8/29  writeByte(MPU9250_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
+  mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
+  fifo_count = ((uint16_t)data[0] << 8) | data[1];
+  packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
+
+  for (ii = 0; ii < packet_count; ii++) {
+	    int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
+	    mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
+	    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
+	    accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+	    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;    
+	    gyro_temp[0]  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+	    gyro_temp[1]  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+	    gyro_temp[2]  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;
+	    
+	    accel_avg[0] += (int32_t) accel_temp[0]; // Sum individual signed 16-bit biases to get accumulated signed 32-bit biases
+	    accel_avg[1] += (int32_t) accel_temp[1];
+	    accel_avg[2] += (int32_t) accel_temp[2];
+	    gyro_avg[0]  += (int32_t) gyro_temp[0];
+	    gyro_avg[1]  += (int32_t) gyro_temp[1];
+	    gyro_avg[2]  += (int32_t) gyro_temp[2];
+		    
+    }
+    accel_avg[0] /= (int32_t) packet_count; // Normalize sums to get average count biases
+    accel_avg[1] /= (int32_t) packet_count;
+    accel_avg[2] /= (int32_t) packet_count;
+    gyro_avg[0]  /= (int32_t) packet_count;
+    gyro_avg[1]  /= (int32_t) packet_count;
+    gyro_avg[2]  /= (int32_t) packet_count;
+    
+//8/29
+ 
+  //  mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values   
+    // Now we'll calculate the accleration value into actual g's
+    data_from_imu.ax =ax = (float)(accel_avg[0]*aRes - accelBias[0]);  // get actual g value, this depends on scale being set
+    data_from_imu.ay =ay = (float)(accel_avg[1]*aRes - accelBias[1]);   //jvm 8/16/15 added () to entire eq
+    data_from_imu.az =az = (float)(accel_avg[2]*aRes - accelBias[2]);  
+   
+    //mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
+    // Calculate the gyro value into actual degrees per second
+    data_from_imu.gx =gx = (float)(gyro_avg[0]*gRes - gyroBias[0]);  // get actual gyro value, this depends on scale being set
+    data_from_imu.gy =gy = (float)(gyro_avg[1]*gRes - gyroBias[1]);  
+    data_from_imu.gz =gz = (float)(gyro_avg[2]*gRes - gyroBias[2]);   
+ /*8/29 
+    mpu9250.readMagData(magCount);  // Read the x/y/z adc values   
+    // Calculate the magnetometer values in milliGauss
+    // Include factory calibration per data sheet and user environmental corrections
+    data_from_imu.mx =mx = (float)(magCount[0]*mRes*magCalibration[0] - magbias[0]);  // get actual magnetometer value, this depends on scale being set
+    data_from_imu.my =my = (float)(magCount[1]*mRes*magCalibration[1] - magbias[1]);  
+    data_from_imu.mz =mz = (float)(magCount[2]*mRes*magCalibration[2] - magbias[2]); 
+8/29*/  
+//8/29
+/* 
+// Construct the gyro biases for push to the hardware gyro bias registers, which are reset to zero upon device startup
+  data[0] = (-gyro_bias[0]/4  >> 8) & 0xFF; // Divide by 4 to get 32.9 LSB per deg/s to conform to expected bias input format
+  data[1] = (-gyro_bias[0]/4)       & 0xFF; // Biases are additive, so change sign on calculated average gyro biases
+  data[2] = (-gyro_bias[1]/4  >> 8) & 0xFF;
+  data[3] = (-gyro_bias[1]/4)       & 0xFF;
+  data[4] = (-gyro_bias[2]/4  >> 8) & 0xFF;
+  data[5] = (-gyro_bias[2]/4)       & 0xFF;
+*/
+/// Push gyro biases to hardware registers
+/*  writeByte(MPU9250_ADDRESS, XG_OFFSET_H, data[0]);
+  writeByte(MPU9250_ADDRESS, XG_OFFSET_L, data[1]);
+  writeByte(MPU9250_ADDRESS, YG_OFFSET_H, data[2]);
+  writeByte(MPU9250_ADDRESS, YG_OFFSET_L, data[3]);
+  writeByte(MPU9250_ADDRESS, ZG_OFFSET_H, data[4]);
+  writeByte(MPU9250_ADDRESS, ZG_OFFSET_L, data[5]);
+*/
+/*
+  dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity; // construct gyro bias in deg/s for later manual subtraction
+  dest1[1] = (float) gyro_bias[1]/(float) gyrosensitivity;
+  dest1[2] = (float) gyro_bias[2]/(float) gyrosensitivity;
+
+// Construct the accelerometer biases for push to the hardware accelerometer bias registers. These registers contain
+// factory trim values which must be added to the calculated accelerometer biases; on boot up these registers will hold
+// non-zero values. In addition, bit 0 of the lower byte must be preserved since it is used for temperature
+// compensation calculations. Accelerometer bias registers expect bias input as 2048 LSB per g, so that
+// the accelerometer biases calculated above must be divided by 8.
+
+  int32_t accel_bias_reg[3] = {0, 0, 0}; // A place to hold the factory accelerometer trim biases
+  readBytes(MPU9250_ADDRESS, XA_OFFSET_H, 2, &data[0]); // Read factory accelerometer trim values
+  accel_bias_reg[0] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+  readBytes(MPU9250_ADDRESS, YA_OFFSET_H, 2, &data[0]);
+  accel_bias_reg[1] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+  readBytes(MPU9250_ADDRESS, ZA_OFFSET_H, 2, &data[0]);
+  accel_bias_reg[2] = (int16_t) ((int16_t)data[0] << 8) | data[1];
+  
+  uint32_t mask = 1uL; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
+  uint8_t mask_bit[3] = {0, 0, 0}; // Define array to hold mask bit for each accelerometer bias axis
+  
+  for(ii = 0; ii < 3; ii++) {
+    if(accel_bias_reg[ii] & mask) mask_bit[ii] = 0x01; // If temperature compensation bit is set, record that fact in mask_bit
+*/
+	return(status);
+  }
 
 // leftovers
 /*        pc.printf("mpu9250 address 0x%x\n\r", MPU9250_ADDRESS); 
