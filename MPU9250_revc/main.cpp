@@ -29,8 +29,9 @@ int sent=0;                     // how many characters were sent to computer
 uint32_t sumCount = 0; //imu 8/16/15
 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
-int az_max=0, az_min=10000; //imu 8/16/15
-
+int32_t az_max=0, az_min=30000; //imu 8/30/15
+//int az_max=0, az_min=10000; //imu 8/16/15
+int azint[100];
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
         float gx, gy, gz;
@@ -158,7 +159,10 @@ enable_fifo();//jvm 8/29
 //pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
 pc.printf("ax=%f, ay=%f, az=%f,", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
 pc.printf(" azmax=%f, azmin=%f \r\n", (float)(az_max*aRes - accelBias[2]), (float)(az_min*aRes - accelBias[2]));
-   
+//pc.printf(" azmax=%x, azmin=%x \r\n", az_max, az_min);
+//for( int k=0; k<25; k++)	{
+// pc.printf(" %d, az=%f \r\n", k, (float)(azint[k]*aRes - accelBias[2]));//azint[k]);
+//}  
 /*keep I want this later
 	            for( int k=0; k<39; k++)
 	                pc.putc(*(ptr+k));
@@ -209,7 +213,7 @@ end keep I want this later*/
 
 			pc.printf("reset\r\n", buffer[254]);
 			az_max=0;
-			az_min=10000;
+			az_min=30000;
 
 			for(received=254; received >-1 ;received--)	
 				buffer[received]=0;
@@ -390,6 +394,7 @@ int status;
 	    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
 	    accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
 	    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+azint[ii]=accel_temp[2];
 if (az_max < accel_temp[2])
 	az_max=accel_temp[2];
 if (az_min > accel_temp[2])
