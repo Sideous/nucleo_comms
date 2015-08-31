@@ -29,15 +29,13 @@ int sent=0;                     // how many characters were sent to computer
 uint32_t sumCount = 0; //imu 8/16/15
 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
-float az_max=0, az_min=10000; //imu 8/16/15
+int az_max=0, az_min=10000; //imu 8/16/15
 
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
         float gx, gy, gz;
         float mx, my, mz, temp;
       } data_from_imu;
-
-
 // mbed - initialization of peripherals
 
 Serial pc(PA_2, PA_3);         // initialize SERIAL_TX=PA_9, SERIAL_RX=PA_10
@@ -157,8 +155,10 @@ enable_fifo();//jvm 8/29
 	    switch (buffer[0]) {
 	        case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
 //so I can get away with just terminal editor
-pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
- 
+//pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
+pc.printf("ax=%f, ay=%f, az=%f,", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
+pc.printf(" azmax=%f, azmin=%f \r\n", (float)(az_max*aRes - accelBias[2]), (float)(az_min*aRes - accelBias[2]));
+   
 /*keep I want this later
 	            for( int k=0; k<39; k++)
 	                pc.putc(*(ptr+k));
@@ -201,6 +201,19 @@ end keep I want this later*/
 					buffer[received]=0;
 				received=0;
 			} //end else if
+
+		}
+
+		else if(strstr(buffer,"reset")) {
+			//read $$ reads register dec$$, read 0x##: reads register hex##
+
+			pc.printf("reset\r\n", buffer[254]);
+			az_max=0;
+			az_min=10000;
+
+			for(received=254; received >-1 ;received--)	
+				buffer[received]=0;
+			received=0;
 
 		}	
 
@@ -376,7 +389,11 @@ int status;
 	    mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
 	    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample in FIFO
 	    accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
-	    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;    
+	    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+if (az_max < accel_temp[2])
+	az_max=accel_temp[2];
+if (az_min > accel_temp[2])
+	az_min= accel_temp[2];    
 	    gyro_temp[0]  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
 	    gyro_temp[1]  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
 	    gyro_temp[2]  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;
