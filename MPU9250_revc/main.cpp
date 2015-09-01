@@ -11,11 +11,6 @@
 #include "mbed.h"
 #include "MPU9250.h" //imu 8/16/15
 /* Defines -----------------------------------------------------------------------*/
- 
-//#include<stdio.h>
-//#include<stdlib.h>
-//#include<math.h>
- 
 
 /* Function prototypes -----------------------------------------------------------*/
 unsigned long convertToDecimal(char hex[]);
@@ -30,7 +25,6 @@ uint32_t sumCount = 0; //imu 8/16/15
 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
-//int az_max=0, az_min=10000; //imu 8/16/15
 int azint[100];
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
@@ -41,11 +35,6 @@ int azint[100];
 
 Serial pc(PA_2, PA_3);         // initialize SERIAL_TX=PA_9, SERIAL_RX=PA_10
 Serial bb(PA_11, PA_12); // tx, rx jvm added 8/15/15
-// temp switch so I can test host code
-//Serial bb(PA_2, PA_3);         // initialize SERIAL_TX=PA_9, SERIAL_RX=PA_10
-//Serial pc(PA_11, PA_12); // tx, rx jvm added 8/15/15
-
-//?? 8/16/15 DigitalOut myled(LED1);
 
 Timer t; //imu 8/16/15
 
@@ -105,37 +94,25 @@ bb.baud(9600);
 
     char *ptr;
         ptr=(char *)&data_from_imu;
-     //****   
-        data_from_imu.ax=1.01;
-        data_from_imu.ay=2.02;
-        data_from_imu.az=3.03;
-        data_from_imu.gx=4.04;
-        data_from_imu.gy=5.05;
-        data_from_imu.gz=6.06;
-        data_from_imu.mx=7.07;
-        data_from_imu.my=8.08;
-        data_from_imu.mz=9.09;
-        data_from_imu.temp=10.1;              
+           
     //Set up I2C
-        i2c.frequency(400000);  // use fast (400 kHz) I2C  
-        pc.printf("CPU SystemCoreClock is %d Hz\r\n", SystemCoreClock);   
-  
-        t.start();        
+    i2c.frequency(400000);  // use fast (400 kHz) I2C  
+    pc.printf("CPU SystemCoreClock is %d Hz\r\n", SystemCoreClock);   
+
+    t.start();        
 
     // Read the WHO_AM_I register, this is a good test of communication
     uint8_t whoami = mpu9250.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
-    
-    
-            mpu9250.resetMPU9250(); // Reset registers to default in preparation for device calibration
-            wait(2);
-            mpu9250.MPU9250SelfTest(SelfTest); // Start by performing self test and reporting values
-            wait(2);
-            mpu9250.calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
-            wait(2);
-            mpu9250.initMPU9250(); 
-            wait(2);
-            mpu9250.initAK8963(magCalibration);
-                mpu9250.getAres(); // Get accelerometer sensitivity
+    mpu9250.resetMPU9250(); // Reset registers to default in preparation for device calibration
+    wait(2);
+    mpu9250.MPU9250SelfTest(SelfTest); // Start by performing self test and reporting values
+    wait(2);
+    mpu9250.calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+    wait(2);
+    mpu9250.initMPU9250(); 
+    wait(2);
+    mpu9250.initAK8963(magCalibration);
+    mpu9250.getAres(); // Get accelerometer sensitivity
     mpu9250.getGres(); // Get gyro sensitivity
     mpu9250.getMres(); // Get magnetometer sensitivity
     pc.printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/aRes);
@@ -147,22 +124,21 @@ bb.baud(9600);
     imu_isr_ticker.attach(&imu_isr, .025); // 8/29 changed from .1//for now only call 10hz.005);   
 
     pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt generated
-enable_fifo();//jvm 8/29	
-	char * hptr, * qptr; //ptr for terminal input
-	char hex[9]={"00000000"};
-	int address, temp;
+    enable_fifo();//jvm 8/29	
+    char * hptr, * qptr; //ptr for terminal input
+    char hex[9]={"00000000"};
+    int address, temp;
+
     while(1) {
         if(received >0) {
 	    switch (buffer[0]) {
-	        case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   // send the character and the character number
-//so I can get away with just terminal editor
+	        case    'R':    //pc.printf("Received char: %c (%d). Success!\r\n", buffer[sent],(int)buffer[sent]);   
+				// send the character and the character number
+
 //pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
 pc.printf("ax=%f, ay=%f, az=%f,", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
 pc.printf(" azmax=%f, azmin=%f \r\n", (float)(az_max*aRes - accelBias[2]), (float)(az_min*aRes - accelBias[2]));
-//pc.printf(" azmax=%x, azmin=%x \r\n", az_max, az_min);
-//for( int k=0; k<25; k++)	{
-// pc.printf(" %d, az=%f \r\n", k, (float)(azint[k]*aRes - accelBias[2]));//azint[k]);
-//}  
+  
 /*keep I want this later
 	            for( int k=0; k<39; k++)
 	                pc.putc(*(ptr+k));
@@ -184,7 +160,6 @@ end keep I want this later*/
 	if (*hptr) {
 		if(strstr(buffer,"read")) {
 			//read $$ reads register dec$$, read 0x##: reads register hex##
-//			pc.printf("read REG address is ");
 
 			if(*(hptr-3)=='x') {	//its in hex 
 				hex[8]='\0';
@@ -195,7 +170,6 @@ end keep I want this later*/
 			else	
 				address=atoi((hptr-3));
 			pc.printf("\r\n");
-//			pc.printf("%d \r\n", address);
 
 			buffer[254]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
 			pc.printf("value read 0x%x\r\n", buffer[254]);
@@ -204,8 +178,7 @@ end keep I want this later*/
 				for(received=254; received >-1 ;received--)
 					buffer[received]=0;
 				received=0;
-			} //end else if
-
+			} 
 		}
 
 		else if(strstr(buffer,"reset")) {
@@ -214,21 +187,15 @@ end keep I want this later*/
 			pc.printf("reset\r\n", buffer[254]);
 			az_max=0;
 			az_min=30000;
-
 			for(received=254; received >-1 ;received--)	
 				buffer[received]=0;
 			received=0;
-
 		}	
-
-
 	}
-
      } //for while
-//8/23        received=0;                                                             // number of received charracters is 0
+
         wait(1);
         i++;                                                                       // wait 1 second
-        //pc.printf("This program runs since %d seconds.\r\n", i++);                      // sends how long is the program running
         myled = !myled;
     }
 }
@@ -242,64 +209,8 @@ end keep I want this later*/
 *******************************************************************************/
 
  void imu_isr()  {
+
    pull_data_from_fifo();
-/* jvm 8/29
-  // If intPin goes high, all data registers have new data
-  if(mpu9250.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
-
-    mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values   
-    // Now we'll calculate the accleration value into actual g's
-    data_from_imu.ax =ax = (float)(accelCount[0]*aRes - accelBias[0]);  // get actual g value, this depends on scale being set
-    data_from_imu.ay =ay = (float)(accelCount[1]*aRes - accelBias[1]);   //jvm 8/16/15 added () to entire eq
-    data_from_imu.az =az = (float)(accelCount[2]*aRes - accelBias[2]);  
-   
-    mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
-    // Calculate the gyro value into actual degrees per second
-    data_from_imu.gx =gx = (float)(gyroCount[0]*gRes - gyroBias[0]);  // get actual gyro value, this depends on scale being set
-    data_from_imu.gy =gy = (float)(gyroCount[1]*gRes - gyroBias[1]);  
-    data_from_imu.gz =gz = (float)(gyroCount[2]*gRes - gyroBias[2]);   
-  
-    mpu9250.readMagData(magCount);  // Read the x/y/z adc values   
-    // Calculate the magnetometer values in milliGauss
-    // Include factory calibration per data sheet and user environmental corrections
-    data_from_imu.mx =mx = (float)(magCount[0]*mRes*magCalibration[0] - magbias[0]);  // get actual magnetometer value, this depends on scale being set
-    data_from_imu.my =my = (float)(magCount[1]*mRes*magCalibration[1] - magbias[1]);  
-    data_from_imu.mz =mz = (float)(magCount[2]*mRes*magCalibration[2] - magbias[2]);   
-
-#if 0
-    //remove for debug**
-    mpu9250.readAccelData(accelCount);  // Read the x/y/z adc values    
-    data_from_imu.ax =(float)accelCount[0];//*aRes;// - accelBias[0]);  // get actual g value, this depends on scale being set
-    data_from_imu.ay =(float)accelCount[1];//*aRes;// - accelBias[1]);   //jvm 8/16/15 added () to entire eq
-    data_from_imu.az =(float)accelCount[2];//*aRes;// - accelBias[2]);  
-mpu9250.readGyroData(gyroCount);  // Read the x/y/z adc values
-    // Calculate the gyro value into actual degrees per second
-    data_from_imu.gx =(float)gyroCount[0];  // get actual gyro value, this depends on scale being set
-    data_from_imu.gy =(float)gyroCount[1];  
-    data_from_imu.gz =(float)gyroCount[2];   
- mpu9250.readMagData(magCount);  // Read the x/y/z adc values  
-    // Calculate the magnetometer values in milliGauss
-    // Include factory calibration per data sheet and user environmental corrections
-    data_from_imu.mx =(float)magCount[0];  // get actual magnetometer value, this depends on scale being set
-    data_from_imu.my =(float)magCount[1];  
-    data_from_imu.mz =(float)magCount[2];  
-  //*****end remove
-
-#endif 
-  }
-    
-   // Pass gyro rate as rad/s
-if (az > az_max)
-    az_max=az;
-if (az < az_min)
-    az_min=az;
-    
-  //mpu9250.MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
-    
-    Now = t.read_us();
-    deltat = (float)((Now - lastUpdate)/1000000.0f) ; // set integration time by time elapsed since last filter update
-    lastUpdate = Now;
-*/
 }
 
 /**
@@ -610,5 +521,17 @@ if (az_min > accel_temp[2])
                 sum = 0;
                 sumCount = 0; 
             } //// if > .5s
+
+     //****   
+        data_from_imu.ax=1.01;
+        data_from_imu.ay=2.02;
+        data_from_imu.az=3.03;
+        data_from_imu.gx=4.04;
+        data_from_imu.gy=5.05;
+        data_from_imu.gz=6.06;
+        data_from_imu.mx=7.07;
+        data_from_imu.my=8.08;
+        data_from_imu.mz=9.09;
+        data_from_imu.temp=10.1;   
 */ 
 //    }//while loop
