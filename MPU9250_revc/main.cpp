@@ -290,9 +290,64 @@ int  pull_data_from_fifo( void)	{
   uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
   uint16_t ii, packet_count, fifo_count;
   int32_t gyro_avg[3] = {0, 0, 0}, accel_avg[3] = {0, 0, 0};
-int status;
-//jvm mod 8/29  wait(0.04); // accumulate 40 samples in 80 milliseconds = 480 bytes
+  int status;
 
+//new 9/2/15
+  struct inertial_device {
+  int16_t acc_x, acc_y, acc_z;
+  int16_t gyr_x, gyr_y, gyr_z;
+  } sample[6];
+  struct element {
+  int32_t	reading;
+  int		ignore;
+  } median_filter[6];
+
+int32_t	lowest=100000, highest=0, sum;
+
+int idx;
+  mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
+  fifo_count = ((uint16_t)data[0] << 8) | data[1];
+  packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
+
+  for (ii = 0, idx=0; ii < packet_count; ii++, idx++) {
+	    int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
+	    mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
+//	    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample 
+	sample[idx].acc_x=(int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each
+//	    accel_temp[1] = (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+	sample[idx].acc_y= (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+//	    accel_temp[2] = (int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+	sample[idx].acc_z =(int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+
+//	    gyro_temp[0]  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+	sample[idx].gyr_x  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+//	    gyro_temp[1]  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+	sample[idx].gyr_y  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+//	    gyro_temp[2]  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;
+	sample[idx].gyr_z  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;		    
+    }
+for (idx=0; idx < 6; idx++)	{
+	median_filter[idx].reading= sample[idx].acc_x
+	if (median_filter[idx].reading < lowest)
+		lowest=median_filter[idx].reading;
+	if (median_filter[idx].reading > highest)
+		highest=median_filter[idx].reading;
+}
+sum=0;
+for (idx=0; idx < 6; idx++)	{
+	if (median_filter[idx].reading == lowest || median_filter[idx].reading == highest )
+		median_filter[idx].ignore=1;
+	else  {
+		median_filter[idx].ignore=0;
+		sum += median_filter[idx].reading;
+	      }
+}
+// make sum average of 4 samples left
+sum=sum >> 2;
+data_from_imu.ax =ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+
+
+/* 9/2
 //jvm mod 8/29// At end of sample accumulation, turn off FIFO sensor read
 //jvm mod 8/29  writeByte(MPU9250_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
   mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
@@ -322,6 +377,7 @@ if (az_min > accel_temp[2])
 	    gyro_avg[2]  += (int32_t) gyro_temp[2];
 		    
     }
+9/2*/
     accel_avg[0] /= (int32_t) packet_count; // Normalize sums to get average count biases
     accel_avg[1] /= (int32_t) packet_count;
     accel_avg[2] /= (int32_t) packet_count;
