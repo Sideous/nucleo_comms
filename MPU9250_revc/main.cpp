@@ -25,7 +25,7 @@ uint32_t sumCount = 0; //imu 8/16/15
 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
-int azint[100];
+//int azint[100];
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
         float gx, gy, gz;
@@ -121,6 +121,7 @@ bb.baud(9600);
     magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
     magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
     magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
+    
     imu_isr_ticker.attach(&imu_isr, .025); // 8/29 changed from .1//for now only call 10hz.005);   
 
     pc.attach(&serialRx,Serial::RxIrq);  // Attach a function serialRx to be called whenever a serial interrupt generated
@@ -156,42 +157,42 @@ end keep I want this later*/
 	    } //for switch
 
 
-	hptr=strchr(buffer,':');
-	if (*hptr) {
-		if(strstr(buffer,"read")) {
-			//read $$ reads register dec$$, read 0x##: reads register hex##
+		hptr=strchr(buffer,':');
+		if (*hptr) {
+			if(strstr(buffer,"read")) {
+				//read $$ reads register dec$$, read 0x##: reads register hex##
 
-			if(*(hptr-3)=='x') {	//its in hex 
-				hex[8]='\0';
-				hex[7]=*(hptr-1);
-				hex[6]=*(hptr-2);
-				address=(int) convertToDecimal(hex);
+				if(*(hptr-3)=='x') {	//its in hex 
+					hex[8]='\0';
+					hex[7]=*(hptr-1);
+					hex[6]=*(hptr-2);
+					address=(int) convertToDecimal(hex);
+				}
+				else	
+					address=atoi((hptr-3));
+				pc.printf("\r\n");
+
+				buffer[254]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
+				pc.printf("value read 0x%x\r\n", buffer[254]);
+				qptr=strchr(buffer,'Q');
+				if(*qptr || (strstr(buffer,"loop") == NULL)) { //should enter only if loop is not input
+					for(received=254; received >-1 ;received--)
+						buffer[received]=0;
+					received=0;
+				} 
 			}
-			else	
-				address=atoi((hptr-3));
-			pc.printf("\r\n");
 
-			buffer[254]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
-			pc.printf("value read 0x%x\r\n", buffer[254]);
-			qptr=strchr(buffer,'Q');
-			if(*qptr || (strstr(buffer,"loop") == NULL)) { //should enter only if loop is not input
-				for(received=254; received >-1 ;received--)
+			else if(strstr(buffer,"reset")) {
+				//read $$ reads register dec$$, read 0x##: reads register hex##
+
+				pc.printf("reset\r\n", buffer[254]);
+				az_max=0;
+				az_min=30000;
+				for(received=254; received >-1 ;received--)	
 					buffer[received]=0;
 				received=0;
-			} 
+			}	
 		}
-
-		else if(strstr(buffer,"reset")) {
-			//read $$ reads register dec$$, read 0x##: reads register hex##
-
-			pc.printf("reset\r\n", buffer[254]);
-			az_max=0;
-			az_min=30000;
-			for(received=254; received >-1 ;received--)	
-				buffer[received]=0;
-			received=0;
-		}	
-	}
      } //for while
 
         wait(1);
@@ -297,9 +298,10 @@ int  pull_data_from_fifo( void)	{
   int16_t acc_x, acc_y, acc_z;
   int16_t gyr_x, gyr_y, gyr_z;
   } sample[6];
+
   struct element {
   int32_t	reading;
-  int		ignore;
+//  int		ignore;
   } median_filter[6];
 
 int32_t	lowest=100000, highest=0, sum;
@@ -310,7 +312,7 @@ int idx;
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
 
   for (ii = 0, idx=0; ii < packet_count; ii++, idx++) {
-	    int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
+//	    int16_t accel_temp[3] = {0, 0, 0}, gyro_temp[3] = {0, 0, 0};
 	    mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
 //	    accel_temp[0] = (int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each sample 
 	sample[idx].acc_x=(int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each
@@ -327,7 +329,34 @@ int idx;
 	sample[idx].gyr_z  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;		    
     }
 for (idx=0; idx < 6; idx++)	{
-	median_filter[idx].reading= sample[idx].acc_x
+	median_filter[idx].reading= sample[idx].acc_x;
+	if (median_filter[idx].reading < lowest)
+		lowest=median_filter[idx].reading;
+	if (median_filter[idx].reading > highest)
+		highest=median_filter[idx].reading;
+}
+sum=0;
+
+for (idx=0; idx < 6; idx++)	{
+	if (median_filter[idx].reading == lowest || median_filter[idx].reading == highest )
+;//		median_filter[idx].ignore=1;
+	else  {
+//		median_filter[idx].ignore=0;
+		sum += median_filter[idx].reading;
+	      }
+}
+
+// make sum average of 4 samples left
+
+sum >>= 2;
+
+data_from_imu.ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+
+lowest=100000;
+highest=0;
+#if 0
+for (idx=0; idx < 6; idx++)	{
+	median_filter[idx].reading= sample[idx].acc_y;
 	if (median_filter[idx].reading < lowest)
 		lowest=median_filter[idx].reading;
 	if (median_filter[idx].reading > highest)
@@ -344,9 +373,30 @@ for (idx=0; idx < 6; idx++)	{
 }
 // make sum average of 4 samples left
 sum=sum >> 2;
-data_from_imu.ax =ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+data_from_imu.ay = (float)(sum*aRes - accelBias[1]);  // get actual g value, this depends on scale being
+lowest=100000;
+highest=0;
 
-
+for (idx=0; idx < 6; idx++)	{
+	median_filter[idx].reading= sample[idx].acc_z;
+	if (median_filter[idx].reading < lowest)
+		lowest=median_filter[idx].reading;
+	if (median_filter[idx].reading > highest)
+		highest=median_filter[idx].reading;
+}
+sum=0;
+for (idx=0; idx < 6; idx++)	{
+	if (median_filter[idx].reading == lowest || median_filter[idx].reading == highest )
+		median_filter[idx].ignore=1;
+	else  {
+		median_filter[idx].ignore=0;
+		sum += median_filter[idx].reading;
+	      }
+}
+// make sum average of 4 samples left
+sum=sum >> 2;
+data_from_imu.az = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
+#endif
 /* 9/2
 //jvm mod 8/29// At end of sample accumulation, turn off FIFO sensor read
 //jvm mod 8/29  writeByte(MPU9250_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
@@ -377,7 +427,7 @@ if (az_min > accel_temp[2])
 	    gyro_avg[2]  += (int32_t) gyro_temp[2];
 		    
     }
-9/2*/
+
     accel_avg[0] /= (int32_t) packet_count; // Normalize sums to get average count biases
     accel_avg[1] /= (int32_t) packet_count;
     accel_avg[2] /= (int32_t) packet_count;
@@ -397,7 +447,8 @@ if (az_min > accel_temp[2])
     // Calculate the gyro value into actual degrees per second
     data_from_imu.gx =gx = (float)(gyro_avg[0]*gRes - gyroBias[0]);  // get actual gyro value, this depends on scale being set
     data_from_imu.gy =gy = (float)(gyro_avg[1]*gRes - gyroBias[1]);  
-    data_from_imu.gz =gz = (float)(gyro_avg[2]*gRes - gyroBias[2]);   
+    data_from_imu.gz =gz = (float)(gyro_avg[2]*gRes - gyroBias[2]); 
+9/2*/  
  /*8/29 
     mpu9250.readMagData(magCount);  // Read the x/y/z adc values   
     // Calculate the magnetometer values in milliGauss
@@ -449,6 +500,7 @@ if (az_min > accel_temp[2])
   for(ii = 0; ii < 3; ii++) {
     if(accel_bias_reg[ii] & mask) mask_bit[ii] = 0x01; // If temperature compensation bit is set, record that fact in mask_bit
 */
+
 	return(status);
   }
 
