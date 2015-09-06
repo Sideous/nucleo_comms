@@ -15,7 +15,7 @@
 /* Function prototypes -----------------------------------------------------------*/
 unsigned long convertToDecimal(char hex[]);
 void enable_fifo(void);
-int  pull_data_from_fifo( void);
+int pull_data_from_fifo(float* fptr);
 /* Variables ---------------------------------------------------------------------*/
 char buffer[255];               // for receiving more characters from the computer
 int received=0;                 // how many characters were received from computer
@@ -26,6 +26,7 @@ float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
 //int azint[100];
+float imu_ax, imu_ay, imu_az;
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
         float gx, gy, gz;
@@ -137,7 +138,8 @@ bb.baud(9600);
 				// send the character and the character number
 
 //pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
-pc.printf("ax=%f, ay=%f, az=%f,", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
+//pc.printf("ax=%f, ay=%f, az=%f,", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
+pc.printf("ax=%f, ay=%f, az=%f,", imu_ax, data_from_imu.ay, data_from_imu.az);
 pc.printf(" azmax=%f, azmin=%f \r\n", (float)(az_max*aRes - accelBias[2]), (float)(az_min*aRes - accelBias[2]));
   
 /*keep I want this later
@@ -210,8 +212,8 @@ end keep I want this later*/
 *******************************************************************************/
 
  void imu_isr()  {
-
-   pull_data_from_fifo();
+imu_az=9.99;
+  pull_data_from_fifo(&imu_az);
 }
 
 /**
@@ -286,7 +288,7 @@ void enable_fifo(void)	{
   mpu9250.writeByte(MPU9250_ADDRESS, USER_CTRL, 0x40);   // Enable FIFO  
   mpu9250.writeByte(MPU9250_ADDRESS, FIFO_EN, 0x78);     // Enable gyro and accelerometer sensors for FIFO (max size 512 bytes in MPU-9250)
 }
-int  pull_data_from_fifo( void)	{
+int  pull_data_from_fifo (float* fptr)	{
 
   uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
   uint16_t ii, packet_count, fifo_count;
@@ -305,6 +307,8 @@ int  pull_data_from_fifo( void)	{
   } median_filter[6];
 
 int32_t	lowest=100000, highest=0, sum;
+float* xfloat;
+float yfloat;
 
 int idx;
   mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
@@ -349,12 +353,14 @@ for (idx=0; idx < 6; idx++)	{
 // make sum average of 4 samples left
 
 sum >>= 2;
-
-data_from_imu.ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+//xfloat=(float)sum*aRes-accelBias[0];
+//imu_ax=xfloat;//, imu_ay, imu_z;
+//data_from_imu.ax = xfloat - accelBias[0];  // get actual g value, this depends on scale being
+//data_from_imu.ax =xfloat;
 
 lowest=100000;
 highest=0;
-#if 0
+
 for (idx=0; idx < 6; idx++)	{
 	median_filter[idx].reading= sample[idx].acc_y;
 	if (median_filter[idx].reading < lowest)
@@ -365,15 +371,16 @@ for (idx=0; idx < 6; idx++)	{
 sum=0;
 for (idx=0; idx < 6; idx++)	{
 	if (median_filter[idx].reading == lowest || median_filter[idx].reading == highest )
-		median_filter[idx].ignore=1;
+		;//median_filter[idx].ignore=1;
 	else  {
-		median_filter[idx].ignore=0;
+		//median_filter[idx].ignore=0;
 		sum += median_filter[idx].reading;
 	      }
 }
 // make sum average of 4 samples left
-sum=sum >> 2;
-data_from_imu.ay = (float)(sum*aRes - accelBias[1]);  // get actual g value, this depends on scale being
+sum >>= 2;
+
+//*** need fix? data_from_imu.ay = (float)(sum*aRes - accelBias[1]);  // get actual g value, this depends on scale being
 lowest=100000;
 highest=0;
 
@@ -387,16 +394,19 @@ for (idx=0; idx < 6; idx++)	{
 sum=0;
 for (idx=0; idx < 6; idx++)	{
 	if (median_filter[idx].reading == lowest || median_filter[idx].reading == highest )
-		median_filter[idx].ignore=1;
+		;//median_filter[idx].ignore=1;
 	else  {
-		median_filter[idx].ignore=0;
+		//median_filter[idx].ignore=0;
 		sum += median_filter[idx].reading;
 	      }
 }
 // make sum average of 4 samples left
-sum=sum >> 2;
-data_from_imu.az = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
-#endif
+sum >>= 2;
+//imu_az = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
+xfloat=&yfloat;
+*xfloat = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
+//*fptr = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
+//data_from_imu.az=xfloat;
 /* 9/2
 //jvm mod 8/29// At end of sample accumulation, turn off FIFO sensor read
 //jvm mod 8/29  writeByte(MPU9250_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
@@ -502,6 +512,7 @@ if (az_min > accel_temp[2])
 */
 
 	return(status);
+	//return(xfloat);
   }
 
 // leftovers
