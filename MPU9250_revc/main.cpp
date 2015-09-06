@@ -291,10 +291,63 @@ int  pull_data_from_fifo( void)	{
   uint16_t ii, packet_count, fifo_count;
   int32_t gyro_avg[3] = {0, 0, 0}, accel_avg[3] = {0, 0, 0};
 int status;
-//jvm mod 8/29  wait(0.04); // accumulate 40 samples in 80 milliseconds = 480 bytes
+#if 0
+//jvm 9/6
+  struct inertial_device {
+  int16_t acc_x, acc_y, acc_z;
+  int16_t gyr_x, gyr_y, gyr_z;
+  } ;
+  struct element {
+  int32_t	reading;
+  
+  } median_filter[6];
 
-//jvm mod 8/29// At end of sample accumulation, turn off FIFO sensor read
-//jvm mod 8/29  writeByte(MPU9250_ADDRESS, FIFO_EN, 0x00);        // Disable gyro and accelerometer sensors for FIFO
+  int32_t	lowest, highest, sum;
+
+  int idx;
+  mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
+  fifo_count = ((uint16_t)data[0] << 8) | data[1];
+  packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
+  
+  struct inertial_device sample[packet_count];
+  
+  for (idx=0; idx < packet_count; idx++) {
+	mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
+	sample[idx].acc_x=(int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each
+	sample[idx].acc_y= (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+	sample[idx].acc_z =(int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+	sample[idx].gyr_x  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+	sample[idx].gyr_y  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+	sample[idx].gyr_z  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;	
+  }
+  //find the lowest and the highest sample of each imu element
+  lowest=100000, highest=0;
+  for( idx=0; idx< packet_count; idx++)	{
+	//median_filter[idx].reading= sample[idx].acc_x;
+	if (sample[idx].acc_x < lowest)
+		lowest=sample[idx].acc_x;
+	if (sample[idx].acc_x > highest)
+		highest=sample[idx].acc_x;
+  }
+
+  //eliminate the lowest and the highest sample avg the rest
+  sum=0;
+  for (idx=0; idx < packet_count; idx++)	{
+	if (sample[idx].acc_x == lowest || sample[idx].acc_x == highest )
+		;
+	else  
+		sum += sample[idx].acc_x;
+  }
+
+  if (packet_count == 6)
+	sum >>= 2;
+  else 
+	sum /= (packet_count);
+
+  data_from_imu.ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+
+//jvm 9/6
+#endif
   mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
   fifo_count = ((uint16_t)data[0] << 8) | data[1];
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
