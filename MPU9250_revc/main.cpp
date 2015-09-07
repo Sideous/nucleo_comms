@@ -17,19 +17,19 @@ unsigned long convertToDecimal(char hex[]);
 void enable_fifo(void);
 int  pull_data_from_fifo( void);
 /* Variables ---------------------------------------------------------------------*/
-char buffer[255];               // for receiving more characters from the computer
+char buffer[45];	//9/6/15 [255];               // for receiving more characters from the computer
 int received=0;                 // how many characters were received from computer
 int sent=0;                     // how many characters were sent to computer
 
 uint32_t sumCount = 0; //imu 8/16/15
-float sum = 0; //imu 8/16/15
+//9/6/15 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
 
 struct inertial_device {
 	int16_t acc_x, acc_y, acc_z;
 	int16_t gyr_x, gyr_y, gyr_z;
-  } sample[13];
+  } sample[30];
 
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
@@ -62,7 +62,10 @@ void serialRx()
 {
     while(pc.readable()) {              // while there is a character to read from the serial port.
         char c=pc.getc();               // receive the charracter
-        buffer[received++]=c;           // save the charracter to the next place in buffer, increments number of receive charactbers
+	if(received < 54)
+        	buffer[received++]=c;           // save the charracter to the next place in buffer, increments number of receive charactbers
+	else
+		received=0;		//9/6/15
 	pc.putc(c);			//echo
     }
 }
@@ -120,9 +123,9 @@ bb.baud(9600);
     mpu9250.getAres(); // Get accelerometer sensitivity
     mpu9250.getGres(); // Get gyro sensitivity
     mpu9250.getMres(); // Get magnetometer sensitivity
-    pc.printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/aRes);
-    pc.printf("Gyroscope sensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
-    pc.printf("Magnetometer sensitivity is %f LSB/G \n\r", 1.0f/mRes);
+    pc.printf("Accel sensitivity is %f LSB/g \n\r", 1.0f/aRes);
+    pc.printf("Gyrosensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
+    pc.printf("Magnetom sensitivity is %f LSB/G \n\r", 1.0f/mRes);
     magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
     magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
     magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
@@ -176,11 +179,11 @@ end keep I want this later*/
 				address=atoi((hptr-3));
 			pc.printf("\r\n");
 
-			buffer[254]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
-			pc.printf("value read 0x%x\r\n", buffer[254]);
+			buffer[54]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
+			pc.printf("value read 0x%x\r\n", buffer[54]);
 			qptr=strchr(buffer,'Q');
 			if(*qptr || (strstr(buffer,"loop") == NULL)) { //should enter only if loop is not input
-				for(received=254; received >-1 ;received--)
+				for(received=54; received >-1 ;received--)
 					buffer[received]=0;
 				received=0;
 			} 
@@ -189,10 +192,10 @@ end keep I want this later*/
 		else if(strstr(buffer,"reset")) {
 			//read $$ reads register dec$$, read 0x##: reads register hex##
 
-			pc.printf("reset\r\n", buffer[254]);
+			pc.printf("reset\r\n", buffer[54]);
 			az_max=0;
 			az_min=30000;
-			for(received=254; received >-1 ;received--)	
+			for(received=54; received >-1 ;received--)	
 				buffer[received]=0;
 			received=0;
 		}	
@@ -260,7 +263,7 @@ unsigned long convertToDecimal(char hex[])
         }
         else
         {
-            printf(" Invalid Hexadecimal Number \n");
+            printf(" Invalid Hex Number \n");
  
             printf(" Press enter to continue... \n");
             fflush(stdin);
@@ -307,8 +310,8 @@ int status;
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
  
 //sample array is only 35 elements
-  if( packet_count > 11)
-	packet_count=11;
+  if( packet_count > 29)
+	packet_count=29;
   
   for (idx=0; idx < packet_count; idx++) {
 	mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
@@ -322,7 +325,6 @@ int status;
   //find the lowest and the highest sample of each imu element
   lowest=100000, highest=0;
   for( idx=0; idx< packet_count; idx++)	{
-	//median_filter[idx].reading= sample[idx].acc_x;
 	if (sample[idx].acc_x < lowest)
 		lowest=sample[idx].acc_x;
 	if (sample[idx].acc_x > highest)
@@ -367,7 +369,7 @@ int status;
   else 
 	sum /= (packet_count-2);
 
-  data_from_imu.ay = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+  data_from_imu.ay = (float)(sum*aRes - accelBias[1]);  // get actual g value, this depends on scale being
 
   lowest=100000, highest=0;
   for( idx=0; idx< packet_count; idx++)	{
@@ -397,7 +399,7 @@ int status;
   if (az_min > sum)
 	az_min= sum; 
 
-  data_from_imu.az = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+  data_from_imu.az = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
 data_from_imu.temp= (float)packet_count;
 //jvm 9/6
 //#endif
