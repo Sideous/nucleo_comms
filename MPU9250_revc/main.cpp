@@ -25,11 +25,13 @@ uint32_t sumCount = 0; //imu 8/16/15
 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
-
+/*
 struct inertial_device {
 	int16_t acc_x, acc_y, acc_z;
 	int16_t gyr_x, gyr_y, gyr_z;
   } sample[13];
+*/
+
 
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
@@ -298,106 +300,118 @@ int  pull_data_from_fifo( void)	{
 int status;
 //#if 0
 //jvm 9/6
+struct inertial_device {
+	int16_t ax_sum, ax_low, ax_high;
+	int16_t ay_sum, ay_low, ay_high; 
+	int16_t az_sum, az_low, az_high;
+	int16_t gyrx_sum, gyrx_low, gyrx_high; 
+	int16_t gyry_sum, gyry_low, gyry_high; 
+	int16_t gyrz_sum, gyrz_low, gyrz_high;
+  } sample;
 
-  int32_t	lowest, highest, sum;
+  int16_t temp_sample;
+
+  int32_t avg;
 
   int idx;
+//initialize
+	sample.ax_sum=0; sample.ax_low=32766; sample.ax_high=-32766;
+	sample.ay_sum=0; sample.ay_low=32766; sample.ay_high=-32766; 
+	sample.az_sum=0; sample.az_low=32766; sample.az_high=-32766;
+	sample.gyrx_sum=0; sample.gyrx_low=32766; sample.gyrx_high=-32766; 
+	sample.gyry_sum=0; sample.gyry_low=32766; sample.gyry_high=-32766; 
+	sample.gyrz_sum=0; sample.gyrz_low=32766; sample.gyrz_high=-32766;
+
   mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
   fifo_count = ((uint16_t)data[0] << 8) | data[1];
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
  
 //sample array is only 35 elements
-  if( packet_count > 11)
-	packet_count=11;
+ // if( packet_count > 11)
+//	packet_count=11;
   
   for (idx=0; idx < packet_count; idx++) {
 	mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
-	sample[idx].acc_x=(int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each
-	sample[idx].acc_y= (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
-	sample[idx].acc_z =(int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
-	sample[idx].gyr_x  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
-	sample[idx].gyr_y  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
-	sample[idx].gyr_z  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;	
-  }
-  //find the lowest and the highest sample of each imu element
-  lowest=100000, highest=0;
-  for( idx=0; idx< packet_count; idx++)	{
-	//median_filter[idx].reading= sample[idx].acc_x;
-	if (sample[idx].acc_x < lowest)
-		lowest=sample[idx].acc_x;
-	if (sample[idx].acc_x > highest)
-		highest=sample[idx].acc_x;
-  }
-
-  //eliminate the lowest and the highest sample avg the rest
-  sum=0;
-  for (idx=0; idx < packet_count; idx++)	{
-	if (sample[idx].acc_x == lowest || sample[idx].acc_x == highest )
-		;
-	else  
-		sum += sample[idx].acc_x;
-  }
-
-  if (packet_count == 6)
-	sum >>= 2;
-  else 
-	sum /= (packet_count-2);
-
-  data_from_imu.ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
-
-  lowest=100000, highest=0;
-  for( idx=0; idx< packet_count; idx++)	{
-	if (sample[idx].acc_y < lowest)
-		lowest=sample[idx].acc_y;
-	if (sample[idx].acc_y > highest)
-		highest=sample[idx].acc_y;
-  }
-
-  //eliminate the lowest and the highest sample avg the rest
-  sum=0;
-  for (idx=0; idx < packet_count; idx++)	{
-	if (sample[idx].acc_y == lowest || sample[idx].acc_y == highest )
-		;
-	else  
-		sum += sample[idx].acc_y;
-  }
-
-  if (packet_count == 6)
-	sum >>= 2;
-  else 
-	sum /= (packet_count-2);
-
-  data_from_imu.ay = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
-
-  lowest=100000, highest=0;
-  for( idx=0; idx< packet_count; idx++)	{
-	if (sample[idx].acc_z < lowest)
-		lowest=sample[idx].acc_z;
-	if (sample[idx].acc_z > highest)
-		highest=sample[idx].acc_z;
+	temp_sample=(int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each	
+	sample.ax_sum+=temp_sample;
+	if( temp_sample < sample.ax_low)
+		sample.ax_low=temp_sample;
+	if( temp_sample > sample.ax_high)
+		sample.ax_high=temp_sample;
+	// for y
+	temp_sample=(int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;  // Form signed 16-bit integer for each	
+	sample.ay_sum+=temp_sample;
+	if( temp_sample < sample.ay_low)
+		sample.ay_low=temp_sample;
+	if( temp_sample > sample.ay_high)
+		sample.ay_high=temp_sample;
+//	sample.ay_sum+=(int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+	//for z
+	temp_sample=(int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;  // Form signed 16-bit integer for each	
+	sample.az_sum+=temp_sample;
+	if( temp_sample < sample.az_low)
+		sample.az_low=temp_sample;
+	if( temp_sample > sample.az_high)
+		sample.az_high=temp_sample;
+//	sample.az_sum+=(int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+	//for gyro x
+	temp_sample=(int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;  // Form signed 16-bit integer for each	
+	sample.gyrx_sum+=temp_sample;
+	if( temp_sample < sample.gyrx_low)
+		sample.gyrx_low=temp_sample;
+	if( temp_sample > sample.gyrx_high)
+		sample.gyrx_high=temp_sample;
+//	sample[idx].gyr_x  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+	//for gyro y
+	temp_sample=(int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;  // Form signed 16-bit integer for each	
+	sample.gyry_sum+=temp_sample;
+	if( temp_sample < sample.gyry_low)
+		sample.gyry_low=temp_sample;
+	if( temp_sample > sample.gyry_high)
+		sample.gyry_high=temp_sample;
+//	sample[idx].gyr_y  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+	//for gyro z
+	temp_sample=(int16_t) (((int16_t)data[10] << 8) | data[11]  ) ;  // Form signed 16-bit integer for each	
+	sample.gyrz_sum+=temp_sample;
+	if( temp_sample < sample.gyrz_low)
+		sample.gyrz_low=temp_sample;
+	if( temp_sample > sample.gyrz_high)
+		sample.gyrz_high=temp_sample;
+	//sample[idx].gyr_z  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;	
   }
 
   //eliminate the lowest and the highest sample avg the rest
-  sum=0;
-  for (idx=0; idx < packet_count; idx++)	{
-	if (sample[idx].acc_z == lowest || sample[idx].acc_z == highest )
-		;
-	else  
-		sum += sample[idx].acc_z;
-  }
-
-  if (packet_count == 6)
-	sum >>= 2;
-  else 
-	sum /= (packet_count-2);
-
+//for x
+  	avg=sample.ax_sum - sample.ax_low - sample.ax_high;
+	avg/=(packet_count-2); //for avg packet_count minus max and min
+  	data_from_imu.ax = (float)(avg*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+//for y
+  	avg=sample.ay_sum - sample.ay_low - sample.ay_high;
+	avg/=(packet_count-2); //for avg packet_count minus max and min
+  	data_from_imu.ay = (float)(avg*aRes - accelBias[1]);  // get actual g value, this depends on scale being
+//for z
+	avg=sample.az_sum - sample.az_low - sample.az_high;
+	avg/=(packet_count-2); //for avg packet_count minus max and min
+  	data_from_imu.az = (float)(avg*aRes - accelBias[2]);  // get actual g value, this depends on scale being
 
   if (az_max < sum)
 	az_max=sum;
   if (az_min > sum)
 	az_min= sum; 
 
-  data_from_imu.az = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+//for gyro x
+  	avg=sample.gyrx_sum - sample.gyrx_low - sample.gyrx_high;
+	avg/=(packet_count-2); //for avg packet_count minus max and min
+  	data_from_imu.gx = (float)(avg*gRes - gyroBias[0]); 
+//for gyro y
+  	avg=sample.gyry_sum - sample.gyry_low - sample.gyry_high;
+	avg/=(packet_count-2); //for avg packet_count minus max and min
+  	data_from_imu.gy = (float)(avg*gRes - gyroBias[1]);
+//for gryo z
+  	avg=sample.gyrz_sum - sample.gyrz_low - sample.gyrz_high;
+	avg/=(packet_count-2); //for avg packet_count minus max and min
+  	data_from_imu.gz = (float)(avg*gRes - gyroBias[2]);  
+
 data_from_imu.temp= (float)packet_count;
 //jvm 9/6
 //#endif
