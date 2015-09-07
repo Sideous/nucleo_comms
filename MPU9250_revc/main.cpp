@@ -25,7 +25,12 @@ uint32_t sumCount = 0; //imu 8/16/15
 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
-int azint[100];
+
+struct inertial_device {
+	int16_t acc_x, acc_y, acc_z;
+	int16_t gyr_x, gyr_y, gyr_z;
+  } sample[13];
+
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
         float gx, gy, gz;
@@ -137,7 +142,7 @@ bb.baud(9600);
 
 //pc.printf("ax=%f, ay=%f, az=%f \r\n", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
 pc.printf("ax=%f, ay=%f, az=%f,", data_from_imu.ax, data_from_imu.ay, data_from_imu.az);
-pc.printf(" azmax=%f, azmin=%f \r\n", (float)(az_max*aRes - accelBias[2]), (float)(az_min*aRes - accelBias[2]));
+pc.printf(" azmax=%f, azmin=%f, %f \r\n", (float)(az_max*aRes - accelBias[2]), (float)(az_min*aRes - accelBias[2]), data_from_imu.temp);
   
 /*keep I want this later
 	            for( int k=0; k<39; k++)
@@ -291,16 +296,8 @@ int  pull_data_from_fifo( void)	{
   uint16_t ii, packet_count, fifo_count;
   int32_t gyro_avg[3] = {0, 0, 0}, accel_avg[3] = {0, 0, 0};
 int status;
-#if 0
+//#if 0
 //jvm 9/6
-  struct inertial_device {
-  int16_t acc_x, acc_y, acc_z;
-  int16_t gyr_x, gyr_y, gyr_z;
-  } ;
-  struct element {
-  int32_t	reading;
-  
-  } median_filter[6];
 
   int32_t	lowest, highest, sum;
 
@@ -308,8 +305,10 @@ int status;
   mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
   fifo_count = ((uint16_t)data[0] << 8) | data[1];
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
-  
-  struct inertial_device sample[packet_count];
+ 
+//sample array is only 35 elements
+  if( packet_count > 11)
+	packet_count=11;
   
   for (idx=0; idx < packet_count; idx++) {
 	mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
@@ -342,12 +341,67 @@ int status;
   if (packet_count == 6)
 	sum >>= 2;
   else 
-	sum /= (packet_count);
+	sum /= (packet_count-2);
 
   data_from_imu.ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
 
+  lowest=100000, highest=0;
+  for( idx=0; idx< packet_count; idx++)	{
+	if (sample[idx].acc_y < lowest)
+		lowest=sample[idx].acc_y;
+	if (sample[idx].acc_y > highest)
+		highest=sample[idx].acc_y;
+  }
+
+  //eliminate the lowest and the highest sample avg the rest
+  sum=0;
+  for (idx=0; idx < packet_count; idx++)	{
+	if (sample[idx].acc_y == lowest || sample[idx].acc_y == highest )
+		;
+	else  
+		sum += sample[idx].acc_y;
+  }
+
+  if (packet_count == 6)
+	sum >>= 2;
+  else 
+	sum /= (packet_count-2);
+
+  data_from_imu.ay = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+
+  lowest=100000, highest=0;
+  for( idx=0; idx< packet_count; idx++)	{
+	if (sample[idx].acc_z < lowest)
+		lowest=sample[idx].acc_z;
+	if (sample[idx].acc_z > highest)
+		highest=sample[idx].acc_z;
+  }
+
+  //eliminate the lowest and the highest sample avg the rest
+  sum=0;
+  for (idx=0; idx < packet_count; idx++)	{
+	if (sample[idx].acc_z == lowest || sample[idx].acc_z == highest )
+		;
+	else  
+		sum += sample[idx].acc_z;
+  }
+
+  if (packet_count == 6)
+	sum >>= 2;
+  else 
+	sum /= (packet_count-2);
+
+
+  if (az_max < sum)
+	az_max=sum;
+  if (az_min > sum)
+	az_min= sum; 
+
+  data_from_imu.az = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+data_from_imu.temp= (float)packet_count;
 //jvm 9/6
-#endif
+//#endif
+#if 0
   mpu9250.readBytes(MPU9250_ADDRESS, FIFO_COUNTH, 2, &data[0]); // read FIFO sample count
   fifo_count = ((uint16_t)data[0] << 8) | data[1];
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
@@ -446,6 +500,7 @@ if (az_min > accel_temp[2])
   for(ii = 0; ii < 3; ii++) {
     if(accel_bias_reg[ii] & mask) mask_bit[ii] = 0x01; // If temperature compensation bit is set, record that fact in mask_bit
 */
+#endif
 	return(status);
   }
 
