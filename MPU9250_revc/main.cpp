@@ -16,6 +16,7 @@
 unsigned long convertToDecimal(char hex[]);
 void enable_fifo(void);
 int  pull_data_from_fifo( void);
+
 /* Variables ---------------------------------------------------------------------*/
 char buffer[45];	//9/6/15 [255];               // for receiving more characters from the computer
 int received=0;                 // how many characters were received from computer
@@ -37,6 +38,9 @@ struct inertial_device {
         float mx, my, mz, temp;
       } data_from_imu;
 // mbed - initialization of peripherals
+
+int16_t avg_of_median( inertial_device sample_set[], int16_t samples, int16_t start);//( int16_t sample_set[], int16_t samples);
+
 
 Serial pc(PA_2, PA_3);         // initialize SERIAL_TX=PA_9, SERIAL_RX=PA_10
 Serial bb(PA_11, PA_12); // tx, rx jvm added 8/15/15
@@ -370,7 +374,7 @@ int status;
 	sum /= (packet_count-2);
 
   data_from_imu.ay = (float)(sum*aRes - accelBias[1]);  // get actual g value, this depends on scale being
-
+/*9/8/9
   lowest=100000, highest=0;
   for( idx=0; idx< packet_count; idx++)	{
 	if (sample[idx].acc_z < lowest)
@@ -392,7 +396,8 @@ int status;
 	sum >>= 2;
   else 
 	sum /= (packet_count-2);
-
+9/8/15*/
+sum = avg_of_median( sample, 6, 0);
 
   if (az_max < sum)
 	az_max=sum;
@@ -505,7 +510,52 @@ if (az_min > accel_temp[2])
 #endif
 	return(status);
   }
+int16_t avg_of_median( inertial_device sample_set[], int16_t samples, int16_t start)//( int16_t sample_set[], int16_t samples);
+	{
+/**************************************************************************************************
+function avg_of_median by jvm 9/7/15
+	Function eliminates the lowest and highest value of the sample set passed and returns the 
+	average of the remaining samples.
+**************************************************************************************************/
+	int16_t avg=0, idx, smallest=32767, largest=-32766;
+	int32_t sum=0;
+for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx].acc_z < smallest)
+			smallest=sample_set[idx].acc_z;
+		if (sample_set[idx].acc_z > largest)
+			largest=sample_set[idx].acc_z;
 
+  	}
+	for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx].acc_z == smallest || sample_set[idx].acc_z == largest )
+			;
+		else  
+			sum += sample_set[idx].acc_z;
+	}
+	if(samples <2)
+		return(-32766);
+	else
+ 		avg= sum / (samples-2);
+/*  	for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx] < smallest)
+			smallest=sample_set[idx];
+		if (sample_set[idx] > largest)
+			largest=sample_set[idx];
+  	}
+
+	for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx] == smallest || sample_set[idx] == largest )
+			;
+		else  
+			sum += sample_set[idx];
+	}
+	if(samples <2)
+		return(-32766);
+	else
+ 		avg= sum / (samples-2);
+*/
+	return(avg);
+}
 // leftovers
 /*        pc.printf("mpu9250 address 0x%x\n\r", MPU9250_ADDRESS); 
         pc.printf("I AM 0x%x\n\r", whoami); pc.printf("I SHOULD BE 0x71\n\r");
