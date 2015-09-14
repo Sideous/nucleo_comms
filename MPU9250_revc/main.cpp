@@ -16,22 +16,27 @@
 unsigned long convertToDecimal(char hex[]);
 void enable_fifo(void);
 int  pull_data_from_fifo( void);
+
 /* Variables ---------------------------------------------------------------------*/
-char buffer[255];               // for receiving more characters from the computer
+char buffer[45];	//9/6/15 [255];               // for receiving more characters from the computer
 int received=0;                 // how many characters were received from computer
 int sent=0;                     // how many characters were sent to computer
 
 uint32_t sumCount = 0; //imu 8/16/15
-float sum = 0; //imu 8/16/15
+//9/6/15 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
 /*
 struct inertial_device {
 	int16_t acc_x, acc_y, acc_z;
 	int16_t gyr_x, gyr_y, gyr_z;
+<<<<<<< HEAD
   } sample[13];
 */
 
+=======
+  } sample[30];
+>>>>>>> temp_work
 
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
@@ -39,6 +44,9 @@ struct inertial_device {
         float mx, my, mz, temp;
       } data_from_imu;
 // mbed - initialization of peripherals
+
+int16_t avg_of_median( inertial_device sample_set[], int16_t samples, int16_t start);//( int16_t sample_set[], int16_t samples);
+
 
 Serial pc(PA_2, PA_3);         // initialize SERIAL_TX=PA_9, SERIAL_RX=PA_10
 Serial bb(PA_11, PA_12); // tx, rx jvm added 8/15/15
@@ -64,7 +72,10 @@ void serialRx()
 {
     while(pc.readable()) {              // while there is a character to read from the serial port.
         char c=pc.getc();               // receive the charracter
-        buffer[received++]=c;           // save the charracter to the next place in buffer, increments number of receive charactbers
+	if(received < 54)
+        	buffer[received++]=c;           // save the charracter to the next place in buffer, increments number of receive charactbers
+	else
+		received=0;		//9/6/15
 	pc.putc(c);			//echo
     }
 }
@@ -122,9 +133,9 @@ bb.baud(9600);
     mpu9250.getAres(); // Get accelerometer sensitivity
     mpu9250.getGres(); // Get gyro sensitivity
     mpu9250.getMres(); // Get magnetometer sensitivity
-    pc.printf("Accelerometer sensitivity is %f LSB/g \n\r", 1.0f/aRes);
-    pc.printf("Gyroscope sensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
-    pc.printf("Magnetometer sensitivity is %f LSB/G \n\r", 1.0f/mRes);
+    pc.printf("Accel sensitivity is %f LSB/g \n\r", 1.0f/aRes);
+    pc.printf("Gyrosensitivity is %f LSB/deg/s \n\r", 1.0f/gRes);
+    pc.printf("Magnetom sensitivity is %f LSB/G \n\r", 1.0f/mRes);
     magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
     magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
     magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
@@ -178,11 +189,11 @@ end keep I want this later*/
 				address=atoi((hptr-3));
 			pc.printf("\r\n");
 
-			buffer[254]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
-			pc.printf("value read 0x%x\r\n", buffer[254]);
+			buffer[54]=mpu9250.readByte(MPU9250_ADDRESS, (char) address);
+			pc.printf("value read 0x%x\r\n", buffer[54]);
 			qptr=strchr(buffer,'Q');
 			if(*qptr || (strstr(buffer,"loop") == NULL)) { //should enter only if loop is not input
-				for(received=254; received >-1 ;received--)
+				for(received=54; received >-1 ;received--)
 					buffer[received]=0;
 				received=0;
 			} 
@@ -191,10 +202,10 @@ end keep I want this later*/
 		else if(strstr(buffer,"reset")) {
 			//read $$ reads register dec$$, read 0x##: reads register hex##
 
-			pc.printf("reset\r\n", buffer[254]);
+			pc.printf("reset\r\n", buffer[54]);
 			az_max=0;
 			az_min=30000;
-			for(received=254; received >-1 ;received--)	
+			for(received=54; received >-1 ;received--)	
 				buffer[received]=0;
 			received=0;
 		}	
@@ -262,7 +273,7 @@ unsigned long convertToDecimal(char hex[])
         }
         else
         {
-            printf(" Invalid Hexadecimal Number \n");
+            printf(" Invalid Hex Number \n");
  
             printf(" Press enter to continue... \n");
             fflush(stdin);
@@ -327,6 +338,7 @@ struct inertial_device {
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
  
 //sample array is only 35 elements
+<<<<<<< HEAD
  // if( packet_count > 11)
 //	packet_count=11;
   
@@ -393,12 +405,99 @@ struct inertial_device {
 	avg=sample.az_sum - sample.az_low - sample.az_high;
 	avg/=(packet_count-2); //for avg packet_count minus max and min
   	data_from_imu.az = (float)(avg*aRes - accelBias[2]);  // get actual g value, this depends on scale being
+=======
+  if( packet_count > 29)
+	packet_count=29;
+  
+  for (idx=0; idx < packet_count; idx++) {
+	mpu9250.readBytes(MPU9250_ADDRESS, FIFO_R_W, 12, &data[0]); // read data for averaging
+	sample[idx].acc_x=(int16_t) (((int16_t)data[0] << 8) | data[1]  ) ;  // Form signed 16-bit integer for each
+	sample[idx].acc_y= (int16_t) (((int16_t)data[2] << 8) | data[3]  ) ;
+	sample[idx].acc_z =(int16_t) (((int16_t)data[4] << 8) | data[5]  ) ;
+	sample[idx].gyr_x  = (int16_t) (((int16_t)data[6] << 8) | data[7]  ) ;
+	sample[idx].gyr_y  = (int16_t) (((int16_t)data[8] << 8) | data[9]  ) ;
+	sample[idx].gyr_z  = (int16_t) (((int16_t)data[10] << 8) | data[11]) ;	
+  }
+  //find the lowest and the highest sample of each imu element
+  lowest=100000, highest=0;
+  for( idx=0; idx< packet_count; idx++)	{
+	if (sample[idx].acc_x < lowest)
+		lowest=sample[idx].acc_x;
+	if (sample[idx].acc_x > highest)
+		highest=sample[idx].acc_x;
+  }
+
+  //eliminate the lowest and the highest sample avg the rest
+  sum=0;
+  for (idx=0; idx < packet_count; idx++)	{
+	if (sample[idx].acc_x == lowest || sample[idx].acc_x == highest )
+		;
+	else  
+		sum += sample[idx].acc_x;
+  }
+
+  if (packet_count == 6)
+	sum >>= 2;
+  else 
+	sum /= (packet_count-2);
+
+  data_from_imu.ax = (float)(sum*aRes - accelBias[0]);  // get actual g value, this depends on scale being
+
+  lowest=100000, highest=0;
+  for( idx=0; idx< packet_count; idx++)	{
+	if (sample[idx].acc_y < lowest)
+		lowest=sample[idx].acc_y;
+	if (sample[idx].acc_y > highest)
+		highest=sample[idx].acc_y;
+  }
+
+  //eliminate the lowest and the highest sample avg the rest
+  sum=0;
+  for (idx=0; idx < packet_count; idx++)	{
+	if (sample[idx].acc_y == lowest || sample[idx].acc_y == highest )
+		;
+	else  
+		sum += sample[idx].acc_y;
+  }
+
+  if (packet_count == 6)
+	sum >>= 2;
+  else 
+	sum /= (packet_count-2);
+
+  data_from_imu.ay = (float)(sum*aRes - accelBias[1]);  // get actual g value, this depends on scale being
+/*9/8/9
+  lowest=100000, highest=0;
+  for( idx=0; idx< packet_count; idx++)	{
+	if (sample[idx].acc_z < lowest)
+		lowest=sample[idx].acc_z;
+	if (sample[idx].acc_z > highest)
+		highest=sample[idx].acc_z;
+  }
+
+  //eliminate the lowest and the highest sample avg the rest
+  sum=0;
+  for (idx=0; idx < packet_count; idx++)	{
+	if (sample[idx].acc_z == lowest || sample[idx].acc_z == highest )
+		;
+	else  
+		sum += sample[idx].acc_z;
+  }
+
+  if (packet_count == 6)
+	sum >>= 2;
+  else 
+	sum /= (packet_count-2);
+9/8/15*/
+sum = avg_of_median( sample, 6, 0);
+>>>>>>> temp_work
 
   if (az_max < sum)
 	az_max=sum;
   if (az_min > sum)
 	az_min= sum; 
 
+<<<<<<< HEAD
 //for gyro x
   	avg=sample.gyrx_sum - sample.gyrx_low - sample.gyrx_high;
 	avg/=(packet_count-2); //for avg packet_count minus max and min
@@ -412,6 +511,9 @@ struct inertial_device {
 	avg/=(packet_count-2); //for avg packet_count minus max and min
   	data_from_imu.gz = (float)(avg*gRes - gyroBias[2]);  
 
+=======
+  data_from_imu.az = (float)(sum*aRes - accelBias[2]);  // get actual g value, this depends on scale being
+>>>>>>> temp_work
 data_from_imu.temp= (float)packet_count;
 //jvm 9/6
 //#endif
@@ -517,7 +619,52 @@ if (az_min > accel_temp[2])
 #endif
 	return(status);
   }
+int16_t avg_of_median( inertial_device sample_set[], int16_t samples, int16_t start)//( int16_t sample_set[], int16_t samples);
+	{
+/**************************************************************************************************
+function avg_of_median by jvm 9/7/15
+	Function eliminates the lowest and highest value of the sample set passed and returns the 
+	average of the remaining samples.
+**************************************************************************************************/
+	int16_t avg=0, idx, smallest=32767, largest=-32766;
+	int32_t sum=0;
+for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx].acc_z < smallest)
+			smallest=sample_set[idx].acc_z;
+		if (sample_set[idx].acc_z > largest)
+			largest=sample_set[idx].acc_z;
 
+  	}
+	for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx].acc_z == smallest || sample_set[idx].acc_z == largest )
+			;
+		else  
+			sum += sample_set[idx].acc_z;
+	}
+	if(samples <2)
+		return(-32766);
+	else
+ 		avg= sum / (samples-2);
+/*  	for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx] < smallest)
+			smallest=sample_set[idx];
+		if (sample_set[idx] > largest)
+			largest=sample_set[idx];
+  	}
+
+	for (idx=0; idx < samples; idx++)	{
+		if (sample_set[idx] == smallest || sample_set[idx] == largest )
+			;
+		else  
+			sum += sample_set[idx];
+	}
+	if(samples <2)
+		return(-32766);
+	else
+ 		avg= sum / (samples-2);
+*/
+	return(avg);
+}
 // leftovers
 /*        pc.printf("mpu9250 address 0x%x\n\r", MPU9250_ADDRESS); 
         pc.printf("I AM 0x%x\n\r", whoami); pc.printf("I SHOULD BE 0x71\n\r");
