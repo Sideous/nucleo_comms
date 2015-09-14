@@ -26,17 +26,11 @@ uint32_t sumCount = 0; //imu 8/16/15
 //9/6/15 float sum = 0; //imu 8/16/15
 MPU9250 mpu9250; //imu 8/16/15
 int32_t az_max=0, az_min=30000; //imu 8/30/15
-/*
+
 struct inertial_device {
 	int16_t acc_x, acc_y, acc_z;
 	int16_t gyr_x, gyr_y, gyr_z;
-<<<<<<< HEAD
-  } sample[13];
-*/
-
-=======
   } sample[30];
->>>>>>> temp_work
 
     struct data_passed { // float = 4 bytes, so data_passed is 10*4=40 bytes
         float ax, ay, az;
@@ -338,7 +332,6 @@ struct inertial_device {
   packet_count = fifo_count/12;// How many sets of full gyro and accelerometer data for averaging
  
 //sample array is only 35 elements
-<<<<<<< HEAD
  // if( packet_count > 11)
 //	packet_count=11;
   
@@ -405,7 +398,7 @@ struct inertial_device {
 	avg=sample.az_sum - sample.az_low - sample.az_high;
 	avg/=(packet_count-2); //for avg packet_count minus max and min
   	data_from_imu.az = (float)(avg*aRes - accelBias[2]);  // get actual g value, this depends on scale being
-=======
+
   if( packet_count > 29)
 	packet_count=29;
   
@@ -791,7 +784,6 @@ for (idx=0; idx < samples; idx++)	{
                 sumCount = 0; 
             } //// if > .5s
 
-     //****   
         data_from_imu.ax=1.01;
         data_from_imu.ay=2.02;
         data_from_imu.az=3.03;
