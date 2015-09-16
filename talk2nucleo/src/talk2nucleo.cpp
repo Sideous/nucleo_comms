@@ -99,7 +99,6 @@ int main(int argc, char *argv[]){
 
 
 
-  //8/18/15
  data_passed * imuptr;
 //8/19/15imu * imuptr;
    imuptr=(data_passed *) &receive; //mapping received buffer to values passed
@@ -112,8 +111,9 @@ int main(int argc, char *argv[]){
    if (count==0) printf("There was no data available to read!\n");
    else {
 
-      for(int k=0;k< 100;k++) {
-    	  write(file, "R\n", 1);
+      for(int k=0;k< 1000;k++) {
+    	 // write(file, "R\n", 1);
+    	  write(file, " D\n", 1);
     	  usleep(1000000);
      	  count = read(file, (void *)receive, 50);
     	  if (count!=0) {
